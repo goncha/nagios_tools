@@ -38,12 +38,11 @@ CARBON_PORT = 2003
 ## Use syslog to output log message
 logger = logging.getLogger("sendgraph")
 logger.setLevel(logging.INFO)
-logger.addHandler(SysLogHandler(address='/dev/log', facility=SysLogHandler.LOG_SYSLOG))
+#logger.addHandler(logging.StreamHandler())
+logger.addHandler(SysLogHandler(address='/dev/log'))
 
-#logging.basicConfig(filename='/var/log/sendgraph.log', level=logging.DEBUG)
 
-
-def send_graph_email(graph, subject, sender, receivers, body=None):
+def send_graph_email(graph, subject, sender, recipients, body=None):
     """
     Builds an email with the attached graph.
 
@@ -54,7 +53,7 @@ def send_graph_email(graph, subject, sender, receivers, body=None):
     :param receivers: list of email addresses to send to.
     :return:
     """
-    logger.debug("body: %s  subject: %s  sender: %s  receivers: %s" % (body, subject, sender, receivers))
+    logger.debug("body: %s  subject: %s  sender: %s  recipients: %s" % (body, subject, sender, recipients))
     if body is None:
         body = '\n'
 
@@ -65,13 +64,13 @@ def send_graph_email(graph, subject, sender, receivers, body=None):
     imgpart.add_header('Content-Disposition', 'attachment', filename='graph.png')
     msg.attach(imgpart)
 
-    msg['to'] = ', '.join(receivers)
+    msg['to'] = ', '.join(recipients)
     msg['from'] = sender
     msg['subject'] = subject
     s = smtplib.SMTP()
     try:
         s.connect()
-        s.sendmail(sender, receivers, msg.as_string())
+        s.sendmail(sender, recipients, msg.as_string())
         s.close()
     except Exception as out:
         logger.error("Sending mail failed: %s" % out)
@@ -95,43 +94,29 @@ def ping_graphite(metric_name):
     logger.info("Updated graphite: %s", message)
 
 def do_options():
-    parser = OptionParser()
+    parser = OptionParser('Usage: %prog [options] recipients')
     parser.add_option('-u', '--url',
                       action='store',
                       dest='graph_url',
                       help="URL to the graphite graph that spawned the nagios alert")
-    parser.add_option('-t', '--to',
+    parser.add_option('-s', '--subject',
                       action='store',
-                      dest = 'recip',
-                      help='Email address of the alert recipient.')
-    parser.add_option('-n', '--name',
-                      action='store',
-                      dest='alertname',
-                      help='The $SERVICENAME$ or $HOSTNAME$ from nagios.')
-    parser.add_option('-s', '--state',
-                      action='store',
-                      dest='state',
-                      help='The $SERVICESTATE$ or $HOSTSTATE$ from nagios.')
-
-    options, args = parser.parse_args()
-    return options
+                      dest='subject',
+                      help='The subject of sending mail.')
+    return parser.parse_args()
 
 def main():
-    options = do_options()
+    options, args = do_options()
     graph_url = options.graph_url
+    subject = options.subject
+    recipients = args
     logger.debug('graph url is %s' % graph_url)
-    alertname = options.alertname
-    state = options.state
-    metric_name = '%s.%s.%s' % ('nagios', alertname.replace(' ', '_'), state)
-    subject = '%s: %s' % (state, alertname)
-    sender = 'graphalert@example.com'
-    receivers = options.recip.split(' ')
     graph = requests.get(graph_url)
     logger.debug("Response headers for graph request: %s", graph.headers)
-    body = "According to graphite, %s is in a %s state. Here's a graph. Check it out." % (alertname, state)
-    send_graph_email(graph.content, subject, sender, receivers, body)
-    logger.debug("Mail sent - pinging graphite now...")
-    ping_graphite(metric_name)
+    body = sys.stdin.read()
+    sender = 'nagios-graphite'
+    send_graph_email(graph.content, subject, sender, recipients, body)
+
 
 if __name__ == '__main__':
     main()
