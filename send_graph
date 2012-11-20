@@ -33,7 +33,7 @@ logger.setLevel(logging.INFO)
 logger.addHandler(SysLogHandler(address='/dev/log'))
 
 
-def send_graph_email(graph, subject, recipients, body=None):
+def send_graph_email(graph, subject, recipients, sender='nagios', body=None):
     """
     Builds an email with the attached graph.
 
@@ -43,8 +43,6 @@ def send_graph_email(graph, subject, recipients, body=None):
     :param body: Text portion of the alert notification email.
     :return:
     """
-    sender = 'USER' in os.environ and os.environ['USER'] or 'nagios'
-
     logger.debug("body: %s  subject: %s  sender: %s  recipients: %s" % (body, subject, sender, recipients))
     if body is None:
         body = '\n'
@@ -78,11 +76,15 @@ def do_options():
     parser.add_option('-s', '--subject',
                       action='store',
                       dest='subject',
-                      help='The subject of sending mail.')
+                      help='The subject of mail.')
     parser.add_option('-m', '--message',
                       action='store',
                       dest='message',
-                      help='The message of sending mail, read from STDIN if not provided')
+                      help='The message of mail, read from STDIN if not provided')
+    parser.add_option('-f', '--from',
+                      action='store',
+                      dest='from',
+                      help='The sender of mail')
 
     return parser.parse_args()
 
@@ -92,6 +94,7 @@ def main():
     graph_url = options.graph_url
     subject = options.subject
     message = options.message
+    sender = options.from
     if not message or message == '-':
         message = sys.stdin.read()
     recipients = args
@@ -100,7 +103,7 @@ def main():
     graph = requests.get(graph_url)
     logger.debug("Response headers for graph request: %s", graph.headers)
 
-    send_graph_email(graph.content, subject, recipients, message)
+    send_graph_email(graph.content, subject, recipients, sender, message)
 
 
 if __name__ == '__main__':
