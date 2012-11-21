@@ -4,12 +4,31 @@
 This is script sent a normal mail notification to contact, but attach a graph which
 grab from the graphite url to the mail.
 
-Example of command defination in Nagios:
+Usage of this script in Nagios:
 
+########### resource.cfg
+# Graphite URL Prefix
+$USER32$=http://localhost:8000/render
+
+
+########### commands.cfg
+# 'notify-service-graph-by-email' command definition
 define command{
 	command_name	notify-service-graph-by-email
-	command_line 	/usr/bin/printf "%b" "***** Nagios *****\n\nNotification Type: $NOTIFICATIONTYPE$\n\nService: $SERVICEDESC$\nHost: $HOSTALIAS$\nAddress: $HOSTADDRESS$\nState: $SERVICESTATE$\n\nDate/Time: $LONGDATETIME$\n\nAdditional Info:\n\n$SERVICEOUTPUT$\n" | /usr/local/nagios/bin/send_graph -u "http://localhost:8000/render?width=800&target=collectd-$HOSTNAME$.$_SERVICEMETRICNAME$&from=-1hour" -s "** $NOTIFICATIONTYPE$ Service Alert: $HOSTALIAS$/$SERVICEDESC$ is $SERVICESTATE$ **" "$CONTACTEMAIL$"
+	command_line 	/usr/bin/printf "%b" "***** Nagios *****\n\nNotification Type: $NOTIFICATIONTYPE$\n\nService: $SERVICEDESC$\nHost: $HOSTALIAS$\nAddress: $HOSTADDRESS$\nState: $SERVICESTATE$\n\nDate/Time: $LONGDATETIME$\n\nAdditional Info:\n\n$SERVICEOUTPUT$\n" | /usr/local/nagios/bin/send_graph -g "$USER32$" -p "collectd-$HOSTNAME$" -t "$_SERVICEMETRICNAME$" -s "** $NOTIFICATIONTYPE$ Service Alert: $HOSTALIAS$/$SERVICEDESC$ is $SERVICESTATE$ **" "$CONTACTEMAIL$"
 	}
+
+
+########### templates.cfg
+define service{
+        name                            load-longterm-service
+        use                             local-service
+        service_description             Load 15min
+	register			0
+
+	_METRICNAME			load.load.longterm
+        }
+
 """
 
 
@@ -53,9 +72,10 @@ def send_graph_email(graph, subject, recipients, sender, body=None):
     msg = MIMEMultipart()
     msg.attach(MIMEText(body))
 
-    imgpart = MIMEImage(graph, _subtype='png')
-    imgpart.add_header('Content-Disposition', 'attachment', filename='graph.png')
-    msg.attach(imgpart)
+    if graph:
+        imgpart = MIMEImage(graph.content, _subtype='png')
+        imgpart.add_header('Content-Disposition', 'attachment', filename='graph.png')
+        msg.attach(imgpart)
 
     msg['to'] = ', '.join(recipients)
     msg['from'] = sender
@@ -72,14 +92,39 @@ def send_graph_email(graph, subject, recipients, sender, body=None):
 def do_options():
     from optparse import OptionParser
     parser = OptionParser('Usage: %prog [options] recipients')
-    parser.add_option('-u', '--url',
+    parser.add_option('-g', '--graphite',
                       action='store',
-                      dest='graph_url',
-                      help="URL to the graphite graph that spawned the nagios alert")
+                      dest='graphite',
+                      help="URL to the graphite render service")
+    parser.add_option('-p', '--target-prefix',
+                      action='store',
+                      dest='prefix',
+                      help="Common prefix for `--target' values")
+    parser.add_option('-t', '--target',
+                      action='append',
+                      dest='targets',
+                      help="Graphite render service `target' parameter without `--target-prefix' value")
+    parser.add_option('-F', '--from-time',
+                      action='store',
+                      dest='fromtime',
+                      default='-1hour',
+                      help="Graphite render service `from' parameter")
+    parser.add_option('-W', '--width',
+                      action='store',
+                      dest='width',
+                      default=600,
+                      type='int',
+                      help="Width of graph")
+    parser.add_option('-H', '--height',
+                      action='store',
+                      dest='height',
+                      default=400,
+                      type='int',
+                      help="Height of graph")
     parser.add_option('-s', '--subject',
                       action='store',
                       dest='subject',
-                      help='Subject of mail.')
+                      help='Subject of mail')
     parser.add_option('-m', '--message',
                       action='store',
                       dest='message',
@@ -94,7 +139,12 @@ def do_options():
 
 def main():
     options, args = do_options()
-    graph_url = options.graph_url
+    graphite_url = options.graphite
+    target_prefix = options.prefix
+    # Filter value ($) of undefined Nagios macro
+    targets = [x for x in options.targets if len(x) > 1]
+    if target_prefix:
+        targets = [target_prefix+'.'+x for x in targets]
     subject = options.subject
     message = options.message
     sender = options.sender
@@ -102,11 +152,21 @@ def main():
         message = sys.stdin.read()
     recipients = args
 
-    logger.debug('graph url is %s' % graph_url)
-    graph = requests.get(graph_url)
-    logger.debug("Response headers for graph request: %s", graph.headers)
+    if targets:
+        graphite_url = graphite_url + \
+            ('?width=%s&height=%s&from=%s&' % (options.width, options.height, options.fromtime,)) + \
+            '&'.join(['target='+x for x in targets])
+        logger.debug('Graphite url is %s' % graphite_url)
+    else:
+        graphite_url = None
+        logger.debug('No Graphite targets, not grab a graph')
 
-    send_graph_email(graph.content, subject, recipients, sender, message)
+    graph = None
+    if graphite_url:
+        graph = requests.get(graphite_url)
+        logger.debug("Response headers for graphite request: %s", graph.headers)
+
+    send_graph_email(graph, subject, recipients, sender, message)
 
 
 if __name__ == '__main__':
