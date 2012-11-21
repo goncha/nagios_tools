@@ -1,8 +1,9 @@
-Some handy scripts we've written for Nagios, at Etsy:
+Some handy scripts for Nagios:
 
 
 check_graphite_data:
     Alert on data, based on number from Graphite.
+    (Original written by Etsy, https://github.com/etsy/nagios_tools)
 Usage:
     check_graphite_data <options>
 Options:
@@ -18,3 +19,15 @@ Options:
     -L --critlower              Lower Holt-Winters band breach causes a crit,
                                     - breaching upper band causes a warn
     (If neither -U nor -L are given, we will always warn)
+
+
+send_graph:
+   Send mail notification by attaching a graph from Graphite.
+   (Original written by bkjongs, https://gist.github.com/1902478)
+Usage:
+   send_graph <options> recipients
+Options:
+   -u <url> --url=<url>                  Graphite URL
+   -s <subject> --subject=<subject>      Subject of mail
+   -m <message> --message=<message>      Message body of mail, read from STDIN if not provided
+   -S <sender> --sender=<sender>         Sender of mail

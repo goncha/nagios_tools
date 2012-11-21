@@ -79,15 +79,15 @@ def do_options():
     parser.add_option('-s', '--subject',
                       action='store',
                       dest='subject',
-                      help='The subject of mail.')
+                      help='Subject of mail.')
     parser.add_option('-m', '--message',
                       action='store',
                       dest='message',
-                      help='The message of mail, read from STDIN if not provided')
-    parser.add_option('-f', '--sender',
+                      help='Message body of mail, read from STDIN if not provided')
+    parser.add_option('-S', '--sender',
                       action='store',
                       dest='sender',
-                      help='The sender of mail')
+                      help='Sender of mail')
 
     return parser.parse_args()
 
