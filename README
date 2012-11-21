@@ -23,7 +23,7 @@ Options:
 
 send_graph:
    Send mail notification by attaching a graph from Graphite.
-   (Original written by bkjongs, https://gist.github.com/1902478)
+   (Original written by bkjones, https://gist.github.com/1902478)
 Usage:
    send_graph <options> recipients
 Options:
