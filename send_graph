@@ -92,10 +92,14 @@ def send_graph_email(graph, subject, recipients, sender, body=None):
 def do_options():
     from optparse import OptionParser
     parser = OptionParser('Usage: %prog [options] recipients')
+    parser.add_option('-G', '--graphite-url',
+                      action='store',
+                      dest='graphite_url',
+                      help="URL to the graphite render service, including parameters and ignore --graphite and other options of parameters")
     parser.add_option('-g', '--graphite',
                       action='store',
                       dest='graphite',
-                      help="URL to the graphite render service")
+                      help="URL to the graphite render service, excluding parameters")
     parser.add_option('-p', '--target-prefix',
                       action='store',
                       dest='prefix',
@@ -103,24 +107,24 @@ def do_options():
     parser.add_option('-t', '--target',
                       action='append',
                       dest='targets',
-                      help="Graphite render service `target' parameter without `--target-prefix' value")
+                      help="Parameter of Graphite render service, `target', without value of `--target-prefix'")
     parser.add_option('-F', '--from-time',
                       action='store',
                       dest='fromtime',
                       default='-1hour',
-                      help="Graphite render service `from' parameter")
+                      help="Parameter of Graphite render service, `from'")
     parser.add_option('-W', '--width',
                       action='store',
                       dest='width',
                       default=600,
                       type='int',
-                      help="Width of graph")
+                      help="Parameter of Graphite render service, `width'")
     parser.add_option('-H', '--height',
                       action='store',
                       dest='height',
                       default=400,
                       type='int',
-                      help="Height of graph")
+                      help="Parameter of Graphite render service, `height'")
     parser.add_option('-s', '--subject',
                       action='store',
                       dest='subject',
@@ -139,12 +143,7 @@ def do_options():
 
 def main():
     options, args = do_options()
-    graphite_url = options.graphite
-    target_prefix = options.prefix
-    # Filter value ($) of undefined Nagios macro
-    targets = [x for x in options.targets if len(x) > 1]
-    if target_prefix:
-        targets = [target_prefix+'.'+x for x in targets]
+    graphite_url = options.graphite_url
     subject = options.subject
     message = options.message
     sender = options.sender
@@ -152,19 +151,30 @@ def main():
         message = sys.stdin.read()
     recipients = args
 
-    if targets:
-        graphite_url = graphite_url + \
-            ('?width=%s&height=%s&from=%s&' % (options.width, options.height, options.fromtime,)) + \
-            '&'.join(['target='+x for x in targets])
-        logger.debug('Graphite url is %s' % graphite_url)
-    else:
-        graphite_url = None
-        logger.debug('No Graphite targets, not grab a graph')
+    if not graphite_url:
+        # If there is no complete Graphite render service url (including parameters),
+        # assemble here from other options.
+        target_prefix = options.prefix
+        # Filter value ($) of undefined Nagios macro
+        targets = [x for x in options.targets if len(x) > 1]
+        if target_prefix:
+            targets = [target_prefix+'.'+x for x in targets]
+
+        if targets:
+            graphite_url = options.graphite + \
+                ('?width=%s&height=%s&from=%s&' % (options.width, options.height, options.fromtime,)) + \
+                '&'.join(['target='+x for x in targets])
+        else:
+            graphite_url = None
+
+    logger.debug('Graphite url is %s' % graphite_url)
 
     graph = None
     if graphite_url:
         graph = requests.get(graphite_url)
         logger.debug("Response headers for graphite request: %s", graph.headers)
+    else:
+        logger.debug('No Graphite url, not grab a graph')
 
     send_graph_email(graph, subject, recipients, sender, message)
 

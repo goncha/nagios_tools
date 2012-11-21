@@ -27,7 +27,18 @@ send_graph:
 Usage:
    send_graph <options> recipients
 Options:
-   -u <url> --url=<url>                  Graphite URL
-   -s <subject> --subject=<subject>      Subject of mail
-   -m <message> --message=<message>      Message body of mail, read from STDIN if not provided
-   -S <sender> --sender=<sender>         Sender of mail
+   -G <url> --graphite-url=<url>                         URL to Graphite render service, including
+      	    						     - parameters and ignore `--graphite' 
+                                                             - and other options of parameters
+   -g <url> --graphite=<url>                             URL to Graphite render service, excluding 
+                                                             - parameters
+   -p <target-prefix> --target-prefix=<target-prefix>    Common prefix for `--target' values
+   -t <target> --target=target                           Parameter of Graphite render service, `target', 
+                                                             - without value of `--target-prefix'
+   -F <from-time> --from-time=<from-time>                Parameter of Graphite render service, `from'
+   -W <width> --width=<width>                            Parameter of Graphite render service, `width'
+   -H <height> --height=<height>                         Parameter of Graphite render service, `height'
+   -s <subject> --subject=<subject>                      Subject of mail
+   -m <message> --message=<message>                      Message body of mail, read from STDIN if not 
+                                                             - provided
+   -S <sender> --sender=<sender>                         Sender of mail
